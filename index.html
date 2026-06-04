@@ -21,7 +21,22 @@ body{font-family:'Segoe UI',sans-serif;background:#080f1e;overflow-x:hidden}
 .sound-btn:hover{background:linear-gradient(145deg,rgba(255,255,255,.2),rgba(255,255,255,.07));border-color:rgba(255,255,255,.22);box-shadow:0 7px 24px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.18),0 0 20px rgba(255,255,255,.07);transform:translateY(-3px) scale(1.04)}
 .sound-btn:active{transform:translateY(-1px) scale(1.01)}
 .sound-btn.active{background:linear-gradient(145deg,rgba(255,255,255,.22),rgba(255,255,255,.08));border-color:rgba(255,255,255,.32);box-shadow:0 4px 20px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.2),0 0 22px rgba(255,255,255,.1)}
-/* rain sub-menu */
+/* rain ambient player */
+.rain-player{padding:4px 4px 8px;margin-bottom:8px;cursor:default}
+.rain-hover-row{overflow:hidden;max-height:0;opacity:0;transform:translateY(8px);transition:max-height .22s ease,opacity .18s,transform .22s ease}
+.rain-player:hover .rain-hover-row{max-height:44px;opacity:1;transform:translateY(0);transition:max-height .32s cubic-bezier(.4,0,.2,1),opacity .25s,transform .32s cubic-bezier(.4,0,.2,1)}
+.rain-hover-inner{display:flex;align-items:center;gap:8px;padding-bottom:8px}
+.rain-bottom-row{display:flex;align-items:center;justify-content:center;padding-top:4px}
+.rain-emoji{font-size:1.3rem;line-height:1}
+.rain-vol-track{position:relative;flex:1;display:flex;align-items:center;min-width:60px}
+.rain-thunder-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#fff;font-size:.95rem;padding:5px 10px;cursor:pointer;transition:all .2s;line-height:1}
+.rain-thunder-btn:hover{background:rgba(255,255,255,.14)}
+.rain-thunder-btn.active{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.32)}
+.rain-play-btn{background:none;border:none;color:#fff;font-size:2rem;cursor:pointer;padding:0 0 0 10px;line-height:1;opacity:0;pointer-events:none;transition:opacity .25s}
+.rain-player:hover .rain-play-btn{opacity:1;pointer-events:auto}
+.rain-divider{height:1px;background:rgba(255,255,255,.07);margin:0 0 14px}
+#lightning-flash{position:absolute;inset:0;z-index:1;pointer-events:none;background:rgba(210,225,255,1);opacity:0}
+/* piano sub-menu */
 .rain-sub-wrap{max-height:0;overflow:hidden;transition:max-height .35s ease,opacity .3s;opacity:0}
 .rain-sub-wrap.open{max-height:80px;opacity:1;margin-bottom:4px}
 .rain-sub-inner{display:flex;gap:8px;padding:6px 0 2px}
@@ -59,6 +74,7 @@ body{font-family:'Segoe UI',sans-serif;background:#080f1e;overflow-x:hidden}
 <div id="page-lofi">
   <canvas id="lofi-canvas" style="position:absolute;inset:0;width:100%;height:100%;z-index:0;display:block"></canvas>
   <div style="position:absolute;inset:0;z-index:0;background:rgba(0,0,0,.28);pointer-events:none"></div>
+  <div id="lightning-flash"></div>
   <div class="lofi-inner">
     <div class="lofi-clock-wrap">
       <div class="lofi-hm" id="lofi-hm">00:00</div>
@@ -66,19 +82,27 @@ body{font-family:'Segoe UI',sans-serif;background:#080f1e;overflow-x:hidden}
       <div class="lofi-date" id="lofi-date"></div>
     </div>
     <div class="lofi-panel">
+      <div class="rain-player">
+        <div class="rain-hover-row">
+          <div class="rain-hover-inner">
+            <span style="font-size:.7rem;opacity:.4">🔈</span>
+            <input type="range" class="vol-slider" id="rain-vol" min="0" max="1" step="0.02" value="0.5" oninput="rainVol(this.value)" style="flex:1;min-width:60px">
+            <span id="rain-vol-pct" style="font-size:.65rem;color:rgba(255,255,255,.45);min-width:30px;text-align:right">50%</span>
+            <button id="thunder-toggle-btn" class="rain-thunder-btn" onclick="rainToggleThunder()">⚡</button>
+          </div>
+        </div>
+        <div class="rain-bottom-row">
+          <span class="rain-emoji">🌧</span>
+          <button class="rain-play-btn" id="rain-play-btn" onclick="rainToggle()">▶</button>
+        </div>
+      </div>
+      <div class="rain-divider"></div>
       <div class="sound-grid">
-        <div class="sound-btn" data-sound="rain" onclick="lofiSelectMain('rain')">🌧</div>
         <div class="sound-btn" data-sound="keyboard" onclick="lofiSelectMain('keyboard')">⌨️</div>
         <div class="sound-btn" data-sound="white" onclick="lofiSelectMain('white')">☁️</div>
         <div class="sound-btn" data-sound="brown" onclick="lofiSelectMain('brown')">🟫</div>
         <div class="sound-btn" data-sound="water" onclick="lofiSelectMain('water')">💧</div>
         <div class="sound-btn" data-sound="piano" onclick="lofiSelectMain('piano')">🎹</div>
-      </div>
-      <div id="rain-sub" class="rain-sub-wrap">
-        <div class="rain-sub-inner">
-          <div class="sound-sub-btn active" style="cursor:default;opacity:.6">🌧</div>
-          <div class="sound-sub-btn" id="thunder-toggle-btn" onclick="lofiToggleThunder()">⚡</div>
-        </div>
       </div>
       <div id="piano-sub" class="rain-sub-wrap">
         <div class="rain-sub-inner">
@@ -116,11 +140,13 @@ function tempColor(c){return c>=80?'#f85149':c>=60?'#d29922':'#3fb950';}
 // ===== LOFI =====
 const _LOFI_BG={rain:'#080f1e',keyboard:'#0d0918',white:'#141927',brown:'#120b05',water:'#05130f',thunder:'#070c18',piano1:'#09091f',piano2:'#0b0816'};
 const _LOFI_LABELS={rain:'🌧 เสียงฝน',keyboard:'⌨️ เสียงคีย์บอร์ด',white:'☁️ White Noise',brown:'🟫 Brown Noise',water:'💧 เสียงน้ำ',thunder:'⚡ ฟ้าร้อง',piano1:'🎹 เปียโน 1',piano2:'🎶 เปียโน 2'};
-let _lofiSound='rain',_lofiPlaying=false,_lofiRAF=null;
-let _lofiLightning=false,_lofiLightAlpha=0,_lofiThunderOn=false;
+let _lofiSound='',_lofiPlaying=false,_lofiRAF=null;
+let _lofiLightning=false,_lofiThunderOn=false;
 const _lofiAudio=new Audio();_lofiAudio.loop=true;
 const _lofiThunderAudio=new Audio();_lofiThunderAudio.loop=true;
-let _lofiPianoType='piano1'; // tracks sub-menu selection
+const _lofiRainAudio=new Audio();_lofiRainAudio.loop=true;
+let _rainPlaying=false;
+let _lofiPianoType='piano1';
 
 // --- canvas helpers ---
 function _lofiCanvas(){return document.getElementById('lofi-canvas');}
@@ -166,13 +192,6 @@ function _animRain(){
       ctx.restore();
       d.y+=d.spd;if(d.y>H+d.len){d.y=-d.len;d.x=Math.random()*W;}
     });
-    // ⚡ lightning flash overlay
-    if(_lofiLightAlpha>0){
-      ctx.save();ctx.globalAlpha=_lofiLightAlpha;
-      ctx.fillStyle='rgba(210,225,255,1)';ctx.fillRect(0,0,W,H);
-      ctx.restore();
-      _lofiLightAlpha=Math.max(0,_lofiLightAlpha-.055);
-    }
     _lofiRAF=requestAnimationFrame(draw);
   }
   draw();
@@ -352,21 +371,17 @@ function _lofiStartBg(type){
   (_LOFI_ANIM[type]||_animRain)();
 }
 
-// --- lightning scheduler ---
+// --- lightning scheduler (CSS overlay) ---
+function _flashLightning(){
+  const el=document.getElementById('lightning-flash');if(!el)return;
+  const seq=[0.75,0,0.45,0,0.9,0.1,0.55,0];
+  let i=0;
+  function step(){if(i>=seq.length)return;el.style.opacity=seq[i++];setTimeout(step,45+Math.random()*65);}
+  step();
+}
 function _scheduleLightning(){
   if(!_lofiLightning)return;
-  setTimeout(()=>{
-    if(!_lofiLightning)return;
-    // multi-flash sequence
-    const seq=[0.75,0,0.45,0,0.9,0.1,0.55,0];
-    let i=0;
-    function flash(){
-      if(i>=seq.length){_scheduleLightning();return;}
-      _lofiLightAlpha=seq[i++];
-      setTimeout(flash,45+Math.random()*65);
-    }
-    flash();
-  },10000+Math.random()*38000);
+  setTimeout(()=>{if(!_lofiLightning)return;_flashLightning();_scheduleLightning();},10000+Math.random()*38000);
 }
 
 // ── LOFI AUDIO ENGINE ────────────────────────────────────
@@ -374,7 +389,7 @@ function _scheduleLightning(){
 // Per-channel fade timers prevent interval conflicts.
 // _lofiPlaying set optimistically so overlay toggles are synchronous.
 const _FADE_MS = 1500;
-const _lofiTimers = { main: null, thunder: null, piano: null };
+const _lofiTimers = { main: null, thunder: null, piano: null, rain: null };
 
 function _lofiVolumeTarget() {
   return parseFloat(document.getElementById('lofi-vol').value) || 0.5;
@@ -406,23 +421,42 @@ function _overlayStop(ch, ael, cb) {
   _fadeTo(ch, ael, 0, () => { ael.pause(); if (cb) cb(); });
 }
 
-function _resetAllOverlays() {
-  // thunder resets with main (tied to rain)
-  _overlayStop('thunder', _lofiThunderAudio);
-  _lofiThunderOn = false; _lofiLightning = false;
-  document.getElementById('thunder-toggle-btn')?.classList.remove('active');
-  // piano is independent — NOT reset when main pauses
+function _rainVolumeTarget(){return parseFloat(document.getElementById('rain-vol').value)||0.5;}
+
+function rainToggle(){
+  if(_rainPlaying){
+    _rainPlaying=false;
+    document.getElementById('rain-play-btn').textContent='▶';
+    _fadeTo('rain',_lofiRainAudio,0,()=>_lofiRainAudio.pause());
+    if(_lofiThunderOn){_overlayStop('thunder',_lofiThunderAudio);_lofiLightning=false;}
+  } else {
+    _lofiRainAudio.src='/more-focus/api/sounds/rain';_lofiRainAudio.volume=0;
+    _rainPlaying=true;
+    document.getElementById('rain-play-btn').textContent='⏸';
+    _lofiRainAudio.play().then(()=>{
+      _fadeTo('rain',_lofiRainAudio,_rainVolumeTarget());
+      if(_lofiThunderOn){_overlayStart('thunder',_lofiThunderAudio,'/more-focus/api/sounds/thunder');_lofiLightning=true;_scheduleLightning();}
+    }).catch(()=>{_rainPlaying=false;document.getElementById('rain-play-btn').textContent='▶';});
+  }
 }
 
-function lofiToggleThunder() {
-  _lofiThunderOn = !_lofiThunderOn;
-  document.getElementById('thunder-toggle-btn').classList.toggle('active', _lofiThunderOn);
-  if (_lofiThunderOn) {
-    _lofiLightning = true; _scheduleLightning();
-    _overlayStart('thunder', _lofiThunderAudio, '/more-focus/api/sounds/thunder');
+function rainVol(v){
+  const vol=parseFloat(v);
+  if(!_lofiTimers.rain)_lofiRainAudio.volume=vol;
+  if(!_lofiTimers.thunder&&!_lofiThunderAudio.paused)_lofiThunderAudio.volume=vol;
+  const pct=document.getElementById('rain-vol-pct');
+  if(pct) pct.textContent=Math.round(vol*100)+'%';
+}
+
+function rainToggleThunder(){
+  _lofiThunderOn=!_lofiThunderOn;
+  document.getElementById('thunder-toggle-btn').classList.toggle('active',_lofiThunderOn);
+  if(_lofiThunderOn&&_rainPlaying){
+    _lofiLightning=true;_scheduleLightning();
+    _overlayStart('thunder',_lofiThunderAudio,'/more-focus/api/sounds/thunder');
   } else {
-    _lofiLightning = false;
-    _overlayStop('thunder', _lofiThunderAudio);
+    _lofiLightning=false;
+    _overlayStop('thunder',_lofiThunderAudio);
   }
 }
 
@@ -433,13 +467,9 @@ function _lofiShowControls() {
 
 // เลือกประเภทเปียโน → เป็น main sound + reveal controls ถ้ายังไม่แสดง
 function lofiPianoSelect(type) {
-  const wasRain = _lofiSound === 'rain';
   _lofiPianoType = type;
   document.getElementById('piano1-sel-btn')?.classList.toggle('active', type === 'piano1');
   document.getElementById('piano2-sel-btn')?.classList.toggle('active', type === 'piano2');
-  if (wasRain && _lofiThunderOn) {
-    _overlayStop('thunder', _lofiThunderAudio); _lofiLightning = false;
-  }
   _lofiApplySound(type);
   _lofiStartBg(type);
   document.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
@@ -461,7 +491,6 @@ function lofiToggle() {
     document.getElementById('lofi-play-btn').textContent = '\u25b6';
     setText('lofi-status', _LOFI_LABELS[_lofiSound]);
     _fadeTo('main', _lofiAudio, 0, () => _lofiAudio.pause());
-    _resetAllOverlays();
   } else {
     _lofiAudio.src = '/more-focus/api/sounds/' + _lofiSound; _lofiAudio.volume = 0;
     _lofiPlaying = true;
@@ -480,8 +509,7 @@ function lofiToggle() {
 
 function lofiVol(v) {
   const vol = parseFloat(v);
-  if (!_lofiTimers.main)    _lofiAudio.volume = vol;
-  if (!_lofiTimers.thunder && !_lofiThunderAudio.paused) _lofiThunderAudio.volume = vol;
+  if (!_lofiTimers.main) _lofiAudio.volume = vol;
   const pct = document.getElementById('lofi-vol-pct');
   if (pct) { pct.textContent = Math.round(vol*100)+'%'; pct.style.left = (vol*100)+'%'; }
 }
@@ -513,8 +541,6 @@ function _lofiDeselect() {
     setText('lofi-status', '');
     _fadeTo('main', _lofiAudio, 0, () => { _lofiAudio.pause(); _lofiAudio.src = ''; });
   }
-  if (_lofiThunderOn) { _overlayStop('thunder', _lofiThunderAudio); _lofiLightning = false; }
-  document.getElementById('rain-sub')?.classList.remove('open');
   document.getElementById('piano-sub')?.classList.remove('open');
   document.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
   _pianoClearCtrl();
@@ -523,43 +549,23 @@ function _lofiDeselect() {
 }
 
 function lofiSelectMain(type) {
-  const rainSub = document.getElementById('rain-sub');
   const pianSub = document.getElementById('piano-sub');
-  const isRain = type === 'rain', isPiano = type === 'piano';
-  const wasRain = _lofiSound === 'rain';
+  const isPiano = type === 'piano';
   const isPianoActive = _lofiSound === 'piano1' || _lofiSound === 'piano2';
 
   // กดอีโมจิที่เลือกอยู่แล้ว → deselect + หุบ controls
-  if ((isRain && wasRain) || (isPiano && isPianoActive) || (!isRain && !isPiano && _lofiSound === type)) {
+  if ((isPiano && isPianoActive) || (!isPiano && _lofiSound === type)) {
     _lofiDeselect();
     return;
   }
 
-  if (isRain) {
-    const open = rainSub.classList.contains('open');
-    if (!open || !wasRain) {
-      rainSub.classList.add('open');
-      if (!wasRain) {
-        _lofiApplySound('rain'); _lofiStartBg('rain');
-        if (_lofiThunderOn && _lofiPlaying) {
-          _overlayStart('thunder', _lofiThunderAudio, '/more-focus/api/sounds/thunder');
-          _lofiLightning = true; _scheduleLightning();
-        }
-      }
-      _lofiShowControls();
-    } else { rainSub.classList.remove('open'); }
-    pianSub.classList.remove('open');
-    document.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('[data-sound="rain"]').classList.add('active');
-  } else if (isPiano) {
+  if (isPiano) {
     pianSub.classList.toggle('open');
-    rainSub.classList.remove('open');
     if (!isPianoActive) _pianoClearCtrl();
     document.querySelector('[data-sound="piano"]')
       ?.classList.toggle('active', isPianoActive || pianSub.classList.contains('open'));
   } else {
-    rainSub.classList.remove('open'); pianSub.classList.remove('open');
-    if (wasRain && _lofiThunderOn) { _overlayStop('thunder', _lofiThunderAudio); _lofiLightning = false; }
+    pianSub.classList.remove('open');
     if (isPianoActive) _pianoClearCtrl();
     _lofiApplySound(type); _lofiStartBg(type);
     document.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));

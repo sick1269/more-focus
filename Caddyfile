@@ -1,8 +1,0 @@
-sick.ddns.net {
-    handle /more-focus* {
-        reverse_proxy localhost:8766
-    }
-    handle {
-        respond 404
-    }
-}
