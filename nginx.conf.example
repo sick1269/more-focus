@@ -1,0 +1,42 @@
+# ===== Nginx config สำหรับ sick.ddns.net/more-focus =====
+# วางใน: nginx/conf/nginx.conf หรือ /etc/nginx/sites-available/sick
+# แล้วเปิด port 80 ใน router forward ไปที่ IP เครื่องนี้
+
+server {
+    listen 80;
+    server_name sick.ddns.net;
+
+    # more-focus lofi app
+    location /more-focus {
+        proxy_pass         http://127.0.0.1:8766;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+
+        # สำหรับ audio streaming (range requests)
+        proxy_set_header   Range             $http_range;
+        proxy_set_header   If-Range          $http_if_range;
+        proxy_buffering    off;
+    }
+
+    # เพิ่ม location อื่นได้ตามต้องการ
+    # location / { ... }
+}
+
+# ===== ถ้าต้องการ HTTPS (แนะนำ) =====
+# ใช้ certbot: certbot --nginx -d sick.ddns.net
+# หรือเพิ่ม:
+#
+# server {
+#     listen 443 ssl;
+#     server_name sick.ddns.net;
+#     ssl_certificate     /path/to/fullchain.pem;
+#     ssl_certificate_key /path/to/privkey.pem;
+#     location /more-focus { ... (เหมือนด้านบน) ... }
+# }
+# server {
+#     listen 80;
+#     server_name sick.ddns.net;
+#     return 301 https://$host$request_uri;
+# }

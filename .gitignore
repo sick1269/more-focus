@@ -1,0 +1,6 @@
+caddy.exe
+caddy.log
+*.log
+__pycache__/
+*.pyc
+.env

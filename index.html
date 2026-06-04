@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>more-focus</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#080f1e;overflow-x:hidden}
+/* LOFI */
+#page-lofi{min-height:100vh;display:block;padding:0;position:relative;overflow:hidden;background-color:#0a1628;transition:background-color 1.5s}
+#page-lofi.active{display:block}
+.lofi-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:30px 20px;position:relative;z-index:1}
+.lofi-hm{font-size:6.5rem;font-weight:700;font-family:'Courier New',monospace;color:#fff;line-height:1;letter-spacing:.03em;text-shadow:0 2px 40px rgba(255,255,255,.15);text-align:center}
+.lofi-ss{font-size:1.3rem;font-weight:300;font-family:'Courier New',monospace;color:rgba(255,255,255,.45);letter-spacing:.15em;margin-top:8px;text-align:center}
+.lofi-date{font-size:.8rem;color:rgba(255,255,255,.35);margin-top:10px;text-align:center;letter-spacing:.06em}
+.lofi-clock-wrap{margin-bottom:36px}
+.lofi-panel{background:rgba(0,0,0,.32);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:24px;width:100%;max-width:500px}
+.sound-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}
+.sound-btn{background:linear-gradient(145deg,rgba(255,255,255,.09),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:16px 8px;cursor:pointer;text-align:center;transition:all .2s cubic-bezier(.175,.885,.32,1.1);font-size:1.85rem;line-height:1;user-select:none;box-shadow:0 4px 16px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.08)}
+.sound-btn:hover{background:linear-gradient(145deg,rgba(255,255,255,.2),rgba(255,255,255,.07));border-color:rgba(255,255,255,.22);box-shadow:0 7px 24px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.18),0 0 20px rgba(255,255,255,.07);transform:translateY(-3px) scale(1.04)}
+.sound-btn:active{transform:translateY(-1px) scale(1.01)}
+.sound-btn.active{background:linear-gradient(145deg,rgba(255,255,255,.22),rgba(255,255,255,.08));border-color:rgba(255,255,255,.32);box-shadow:0 4px 20px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.2),0 0 22px rgba(255,255,255,.1)}
+/* rain sub-menu */
+.rain-sub-wrap{max-height:0;overflow:hidden;transition:max-height .35s ease,opacity .3s;opacity:0}
+.rain-sub-wrap.open{max-height:80px;opacity:1;margin-bottom:4px}
+.rain-sub-inner{display:flex;gap:8px;padding:6px 0 2px}
+.sound-sub-btn{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:12px 6px;cursor:pointer;text-align:center;font-size:1.55rem;line-height:1;transition:all .2s;user-select:none;box-shadow:0 3px 10px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.06)}
+.sound-sub-btn:hover{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.22);transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.3),0 0 14px rgba(255,255,255,.06)}
+.sound-sub-btn.active{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.32);box-shadow:0 3px 14px rgba(0,0,0,.3),0 0 16px rgba(255,255,255,.09)}
+/* controls reveal: hidden until first sound selected */
+.lofi-ctrl-reveal{max-height:0;overflow:hidden;transition:max-height .45s cubic-bezier(.4,0,.2,1),opacity .4s;opacity:0}
+.lofi-ctrl-reveal.show{max-height:120px;opacity:1;margin-top:4px}
+.lofi-controls{display:flex;align-items:center;gap:14px}
+.lofi-play{flex:0 0 auto;background:none;border:none;color:#fff;font-size:2.2rem;cursor:pointer;padding:4px 8px;line-height:1;transition:opacity .2s}
+.lofi-play:hover{opacity:.6}
+.lofi-vol-wrap{flex:1;display:flex;align-items:center;gap:8px;font-size:.75rem;color:rgba(255,255,255,.4)}
+.lofi-vol-track{position:relative;flex:1;display:flex;align-items:center}
+.lofi-vol-pct{
+  position:absolute;top:-26px;
+  transform:translateX(-50%) translateY(6px);
+  background:rgba(12,12,24,.8);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.13);
+  border-radius:5px;padding:2px 8px;
+  font-size:.68rem;font-family:monospace;color:rgba(255,255,255,.88);
+  pointer-events:none;white-space:nowrap;
+  opacity:0;
+  transition:opacity .22s cubic-bezier(.4,0,.2,1),transform .22s cubic-bezier(.4,0,.2,1);
+}
+.lofi-vol-wrap:hover .lofi-vol-pct{opacity:1;transform:translateX(-50%) translateY(0)}
+.vol-slider{flex:1;-webkit-appearance:none;height:3px;border-radius:2px;background:rgba(255,255,255,.18);outline:none;cursor:pointer}
+.vol-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.85);cursor:pointer}
+.lofi-status{font-size:.7rem;color:rgba(255,255,255,.35);text-align:center;margin-top:12px;min-height:1em}
+</style>
+</head>
+<body>
+
+<div id="page-lofi">
+  <canvas id="lofi-canvas" style="position:absolute;inset:0;width:100%;height:100%;z-index:0;display:block"></canvas>
+  <div style="position:absolute;inset:0;z-index:0;background:rgba(0,0,0,.28);pointer-events:none"></div>
+  <div class="lofi-inner">
+    <div class="lofi-clock-wrap">
+      <div class="lofi-hm" id="lofi-hm">00:00</div>
+      <div class="lofi-ss" id="lofi-ss">00</div>
+      <div class="lofi-date" id="lofi-date"></div>
+    </div>
+    <div class="lofi-panel">
+      <div class="sound-grid">
+        <div class="sound-btn" data-sound="rain" onclick="lofiSelectMain('rain')">🌧</div>
+        <div class="sound-btn" data-sound="keyboard" onclick="lofiSelectMain('keyboard')">⌨️</div>
+        <div class="sound-btn" data-sound="white" onclick="lofiSelectMain('white')">☁️</div>
+        <div class="sound-btn" data-sound="brown" onclick="lofiSelectMain('brown')">🟫</div>
+        <div class="sound-btn" data-sound="water" onclick="lofiSelectMain('water')">💧</div>
+        <div class="sound-btn" data-sound="piano" onclick="lofiSelectMain('piano')">🎹</div>
+      </div>
+      <div id="rain-sub" class="rain-sub-wrap">
+        <div class="rain-sub-inner">
+          <div class="sound-sub-btn active" style="cursor:default;opacity:.6">🌧</div>
+          <div class="sound-sub-btn" id="thunder-toggle-btn" onclick="lofiToggleThunder()">⚡</div>
+        </div>
+      </div>
+      <div id="piano-sub" class="rain-sub-wrap">
+        <div class="rain-sub-inner">
+          <div class="sound-sub-btn" id="piano1-sel-btn" onclick="lofiPianoSelect('piano1')">🎹</div>
+          <div class="sound-sub-btn" id="piano2-sel-btn" onclick="lofiPianoSelect('piano2')">🎶</div>
+        </div>
+      </div>
+      <div id="lofi-ctrl-reveal" class="lofi-ctrl-reveal">
+        <div class="lofi-controls">
+          <button class="lofi-play" id="lofi-play-btn" onclick="lofiToggle()">▶</button>
+          <div class="lofi-vol-wrap">
+            <span>🔈</span>
+            <div class="lofi-vol-track">
+              <span id="lofi-vol-pct" class="lofi-vol-pct">50%</span>
+              <input type="range" class="vol-slider" id="lofi-vol" min="0" max="1" step="0.02" value="0.5" oninput="lofiVol(this.value)">
+            </div>
+            <span>🔊</span>
+          </div>
+        </div>
+        <div class="lofi-status" id="lofi-status"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function setText(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
+// ===== HELPERS =====
+const pad=(n,w=2)=>String(Math.floor(n)).padStart(w,'0');
+function fmtHMS(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),ss=s%60;return h?`${pad(h)}:${pad(m)}:${pad(ss)}`:`${pad(m)}:${pad(ss)}`;}
+function fmtSWms(ms){const h=Math.floor(ms/3600000),m=Math.floor(ms%3600000/60000),s=Math.floor(ms%60000/1000),t=Math.floor(ms%1000/100);return `${pad(h)}:${pad(m)}:${pad(s)}.${t}`;}
+function setText(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
+function tempColor(c){return c>=80?'#f85149':c>=60?'#d29922':'#3fb950';}
+
+// ===== LOFI =====
+const _LOFI_BG={rain:'#080f1e',keyboard:'#0d0918',white:'#141927',brown:'#120b05',water:'#05130f',thunder:'#070c18',piano1:'#09091f',piano2:'#0b0816'};
+const _LOFI_LABELS={rain:'🌧 เสียงฝน',keyboard:'⌨️ เสียงคีย์บอร์ด',white:'☁️ White Noise',brown:'🟫 Brown Noise',water:'💧 เสียงน้ำ',thunder:'⚡ ฟ้าร้อง',piano1:'🎹 เปียโน 1',piano2:'🎶 เปียโน 2'};
+let _lofiSound='rain',_lofiPlaying=false,_lofiRAF=null;
+let _lofiLightning=false,_lofiLightAlpha=0,_lofiThunderOn=false;
+const _lofiAudio=new Audio();_lofiAudio.loop=true;
+const _lofiThunderAudio=new Audio();_lofiThunderAudio.loop=true;
+let _lofiPianoType='piano1'; // tracks sub-menu selection
+
+// --- canvas helpers ---
+function _lofiCanvas(){return document.getElementById('lofi-canvas');}
+function _lofiCtx(){const c=_lofiCanvas();return c?c.getContext('2d'):null;}
+function _lofiStopAnim(){if(_lofiRAF){cancelAnimationFrame(_lofiRAF);_lofiRAF=null;}}
+function _lofiInitCanvas(){
+  const c=_lofiCanvas();if(!c)return;
+  const p=c.parentElement;
+  c.width=p.offsetWidth||window.innerWidth;
+  c.height=p.offsetHeight||window.innerHeight;
+}
+
+// --- RAIN: rain drops + warm bokeh city lights ---
+function _animRain(){
+  _lofiInitCanvas();
+  const c=_lofiCanvas(),ctx=_lofiCtx();if(!c)return;
+  const W=c.width,H=c.height;
+  const drops=Array.from({length:220},()=>({
+    x:Math.random()*W, y:Math.random()*H,
+    len:7+Math.random()*14, spd:7+Math.random()*9,
+    a:0.2+Math.random()*0.35, w:0.4+Math.random()*0.5
+  }));
+  const bokeh=Array.from({length:22},()=>({
+    x:Math.random()*W, y:Math.random()*H,
+    r:12+Math.random()*35, a:0.06+Math.random()*0.1,
+    vx:(Math.random()-0.5)*0.12,
+    hue:20+Math.random()*40   // warm orange/amber city lights
+  }));
+  ctx.fillStyle='#080f1e';ctx.fillRect(0,0,W,H);
+  function draw(){
+    ctx.fillStyle='rgba(8,15,30,0.22)';ctx.fillRect(0,0,W,H);
+    bokeh.forEach(b=>{
+      b.x+=b.vx;if(b.x<-b.r)b.x=W+b.r;if(b.x>W+b.r)b.x=-b.r;
+      const g=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,b.r);
+      g.addColorStop(0,`hsla(${b.hue},90%,68%,${b.a})`);
+      g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();
+    });
+    drops.forEach(d=>{
+      ctx.save();ctx.globalAlpha=d.a;
+      ctx.strokeStyle='rgba(160,195,255,0.95)';ctx.lineWidth=d.w;
+      ctx.beginPath();ctx.moveTo(d.x,d.y);ctx.lineTo(d.x-d.len*.18,d.y+d.len);ctx.stroke();
+      ctx.restore();
+      d.y+=d.spd;if(d.y>H+d.len){d.y=-d.len;d.x=Math.random()*W;}
+    });
+    // ⚡ lightning flash overlay
+    if(_lofiLightAlpha>0){
+      ctx.save();ctx.globalAlpha=_lofiLightAlpha;
+      ctx.fillStyle='rgba(210,225,255,1)';ctx.fillRect(0,0,W,H);
+      ctx.restore();
+      _lofiLightAlpha=Math.max(0,_lofiLightAlpha-.055);
+    }
+    _lofiRAF=requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// --- KEYBOARD: gently falling glowing chars ---
+function _animKeyboard(){
+  _lofiInitCanvas();
+  const c=_lofiCanvas(),ctx=_lofiCtx();if(!c)return;
+  const W=c.width,H=c.height;
+  const CHARS='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789⌘⇧↵⌫→←↑↓{}[]<>;:'.split('');
+  const ptcls=Array.from({length:90},()=>({
+    x:Math.random()*W, y:-(Math.random()*H),
+    ch:CHARS[0|Math.random()*CHARS.length],
+    vy:0.25+Math.random()*0.55, vx:(Math.random()-.5)*.1,
+    sz:9+0|Math.random()*13,
+    a:0.07+Math.random()*0.15,
+    hue:255+Math.random()*40
+  }));
+  ctx.fillStyle='#0d0918';ctx.fillRect(0,0,W,H);
+  function draw(){
+    ctx.fillStyle='rgba(13,9,24,0.14)';ctx.fillRect(0,0,W,H);
+    // center radial glow
+    const g=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,W*.55);
+    g.addColorStop(0,'rgba(100,40,190,0.06)');g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    ptcls.forEach(p=>{
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.y>H+20){p.y=-(10+Math.random()*80);p.x=Math.random()*W;p.ch=CHARS[0|Math.random()*CHARS.length];}
+      ctx.save();ctx.globalAlpha=p.a;
+      ctx.fillStyle=`hsl(${p.hue},65%,72%)`;
+      ctx.font=`${p.sz}px monospace`;ctx.fillText(p.ch,p.x,p.y);
+      ctx.restore();
+    });
+    _lofiRAF=requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// --- WHITE NOISE: drifting light blobs + soft film grain ---
+function _animWhiteNoise(){
+  _lofiInitCanvas();
+  const c=_lofiCanvas(),ctx=_lofiCtx();if(!c)return;
+  const W=c.width,H=c.height;
+  let t=0;
+  const blobs=Array.from({length:7},()=>({
+    x:Math.random()*W,y:Math.random()*H,r:70+Math.random()*130,
+    vx:(Math.random()-.5)*.18,vy:(Math.random()-.5)*.12,
+    hue:210+Math.random()*50,ph:Math.random()*Math.PI*2
+  }));
+  ctx.fillStyle='#141927';ctx.fillRect(0,0,W,H);
+  function draw(){
+    t++;
+    ctx.fillStyle='rgba(20,25,39,0.18)';ctx.fillRect(0,0,W,H);
+    blobs.forEach(b=>{
+      b.x+=b.vx;b.y+=b.vy;
+      if(b.x<-b.r||b.x>W+b.r)b.vx*=-1;if(b.y<-b.r||b.y>H+b.r)b.vy*=-1;
+      const pulse=0.045+0.018*Math.sin(t*.018+b.ph);
+      const g=ctx.createRadialGradient(b.x,b.y,0,b.x,b.y,b.r);
+      g.addColorStop(0,`hsla(${b.hue},30%,78%,${pulse})`);g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();
+    });
+    // sparse grain
+    if(t%2===0){
+      ctx.save();ctx.globalAlpha=0.025;ctx.fillStyle='rgba(180,195,255,1)';
+      for(let i=0;i<60;i++)ctx.fillRect(0|Math.random()*W,0|Math.random()*H,1,1);
+      ctx.restore();
+    }
+    _lofiRAF=requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// --- BROWN NOISE: rising embers / fireplace sparks ---
+function _animBrown(){
+  _lofiInitCanvas();
+  const c=_lofiCanvas(),ctx=_lofiCtx();if(!c)return;
+  const W=c.width,H=c.height;
+  function newSpark(){return{x:W*.5+(Math.random()-.5)*W*.45,y:H*.88+Math.random()*H*.1,vx:(Math.random()-.5)*1.1,vy:-(0.9+Math.random()*2.8),life:0,sz:1+Math.random()*2.4};}
+  const sparks=Array.from({length:130},newSpark).map(s=>{s.life=Math.random();return s;});
+  ctx.fillStyle='#120b05';ctx.fillRect(0,0,W,H);
+  function draw(){
+    ctx.fillStyle='rgba(18,11,5,0.22)';ctx.fillRect(0,0,W,H);
+    const fg=ctx.createRadialGradient(W/2,H,0,W/2,H,H*.75);
+    fg.addColorStop(0,'rgba(210,75,0,0.09)');fg.addColorStop(.4,'rgba(130,40,0,0.04)');fg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=fg;ctx.fillRect(0,0,W,H);
+    sparks.forEach((s,i)=>{
+      s.x+=s.vx+Math.sin(Date.now()*.0007+i*.3)*.35;
+      s.y+=s.vy;s.vy-=.014;s.life+=.006;
+      if(s.life>=1)Object.assign(s,newSpark(),{life:0});
+      const p=s.life,hue=12+p*18,lgt=48+p*28;
+      ctx.globalAlpha=(1-p)*.75;
+      ctx.fillStyle=`hsl(${hue},100%,${lgt}%)`;
+      ctx.beginPath();ctx.arc(s.x,s.y,s.sz*(1-p*.35),0,Math.PI*2);ctx.fill();
+    });
+    ctx.globalAlpha=1;
+    _lofiRAF=requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// --- WATER: expanding ripples + caustic shimmer ---
+function _animWater(){
+  _lofiInitCanvas();
+  const c=_lofiCanvas(),ctx=_lofiCtx();if(!c)return;
+  const W=c.width,H=c.height;
+  const ripples=[];let lastR=0;
+  const shimmer=Array.from({length:55},()=>({x:Math.random()*W,y:Math.random()*H,ph:Math.random()*Math.PI*2,sz:.6+Math.random()*1.6}));
+  ctx.fillStyle='#05130f';ctx.fillRect(0,0,W,H);
+  function draw(ts){
+    ctx.fillStyle='rgba(5,19,15,0.2)';ctx.fillRect(0,0,W,H);
+    if(ts-lastR>850){
+      ripples.push({x:.1*W+Math.random()*.8*W,y:.15*H+Math.random()*.7*H,r:0,maxR:55+Math.random()*85,a:.38,spd:.65+Math.random()*.65});
+      lastR=ts;
+    }
+    for(let i=ripples.length-1;i>=0;i--){
+      const rp=ripples[i];rp.r+=rp.spd;rp.a-=.0035;
+      if(rp.a<=0||rp.r>=rp.maxR){ripples.splice(i,1);continue;}
+      ctx.globalAlpha=rp.a;ctx.strokeStyle='rgba(60,190,160,1)';ctx.lineWidth=1.3;
+      ctx.beginPath();ctx.ellipse(rp.x,rp.y,rp.r,rp.r*.38,0,0,Math.PI*2);ctx.stroke();
+      // inner ring
+      if(rp.r>12){ctx.globalAlpha=rp.a*.35;ctx.beginPath();ctx.ellipse(rp.x,rp.y,rp.r*.65,rp.r*.65*.38,0,0,Math.PI*2);ctx.stroke();}
+    }
+    shimmer.forEach(s=>{
+      s.ph+=.022;const a=Math.max(0,Math.sin(s.ph))*.22;
+      ctx.globalAlpha=a;ctx.fillStyle='rgba(100,230,200,1)';
+      ctx.beginPath();ctx.arc(s.x,s.y,s.sz,0,Math.PI*2);ctx.fill();
+    });
+    ctx.globalAlpha=1;
+    _lofiRAF=requestAnimationFrame(draw);
+  }
+  _lofiRAF=requestAnimationFrame(draw);
+}
+
+// --- PIANO: floating music notes + soft glow ---
+function _animPiano(){
+  _lofiInitCanvas();
+  const c=_lofiCanvas(),ctx=_lofiCtx();if(!c)return;
+  const W=c.width,H=c.height;
+  const NOTES='♪♫♩♬'.split('');
+  const ptcls=Array.from({length:45},()=>({
+    x:Math.random()*W, y:H+Math.random()*H,
+    note:NOTES[0|Math.random()*NOTES.length],
+    vy:-(0.18+Math.random()*0.42), vx:(Math.random()-.5)*.12,
+    sz:13+0|Math.random()*16,
+    a:0.06+Math.random()*0.18,
+    hue:230+Math.random()*60, ph:Math.random()*Math.PI*2
+  }));
+  ctx.fillStyle='#09091f';ctx.fillRect(0,0,W,H);
+  let t=0;
+  function draw(){
+    t++;
+    ctx.fillStyle='rgba(9,9,31,0.16)';ctx.fillRect(0,0,W,H);
+    // center soft glow
+    const g=ctx.createRadialGradient(W/2,H*.65,0,W/2,H*.65,W*.48);
+    g.addColorStop(0,'rgba(50,35,110,0.06)');g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    ptcls.forEach(p=>{
+      p.y+=p.vy; p.x+=p.vx+Math.sin(t*.014+p.ph)*.28; p.ph+=.004;
+      if(p.y<-40){p.y=H+20;p.x=Math.random()*W;p.note=NOTES[0|Math.random()*NOTES.length];p.a=.06+Math.random()*.18;}
+      const pulse=.65+.35*Math.sin(t*.022+p.ph*3);
+      ctx.save();ctx.globalAlpha=p.a*pulse;
+      ctx.fillStyle=`hsl(${p.hue},55%,74%)`;
+      ctx.font=`${p.sz}px serif`;ctx.fillText(p.note,p.x,p.y);
+      ctx.restore();
+    });
+    _lofiRAF=requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+const _LOFI_ANIM={rain:_animRain,keyboard:_animKeyboard,white:_animWhiteNoise,brown:_animBrown,water:_animWater,thunder:_animRain,piano1:_animPiano,piano2:_animPiano};
+
+function _lofiStartBg(type){
+  _lofiStopAnim();
+  document.getElementById('page-lofi').style.backgroundColor=_LOFI_BG[type]||_LOFI_BG.rain;
+  (_LOFI_ANIM[type]||_animRain)();
+}
+
+// --- lightning scheduler ---
+function _scheduleLightning(){
+  if(!_lofiLightning)return;
+  setTimeout(()=>{
+    if(!_lofiLightning)return;
+    // multi-flash sequence
+    const seq=[0.75,0,0.45,0,0.9,0.1,0.55,0];
+    let i=0;
+    function flash(){
+      if(i>=seq.length){_scheduleLightning();return;}
+      _lofiLightAlpha=seq[i++];
+      setTimeout(flash,45+Math.random()*65);
+    }
+    flash();
+  },10000+Math.random()*38000);
+}
+
+// ── LOFI AUDIO ENGINE ────────────────────────────────────
+// 3 channels: main · thunder (overlay) · piano (overlay)
+// Per-channel fade timers prevent interval conflicts.
+// _lofiPlaying set optimistically so overlay toggles are synchronous.
+const _FADE_MS = 1500;
+const _lofiTimers = { main: null, thunder: null, piano: null };
+
+function _lofiVolumeTarget() {
+  return parseFloat(document.getElementById('lofi-vol').value) || 0.5;
+}
+
+function _fadeTo(ch, ael, to, cb) {
+  if (_lofiTimers[ch]) { clearInterval(_lofiTimers[ch]); _lofiTimers[ch] = null; }
+  const from = ael.volume;
+  if (Math.abs(from - to) < 0.005) { ael.volume = to; if (cb) cb(); return; }
+  const steps = 40, iv = _FADE_MS / steps, d = (to - from) / steps;
+  let cur = from, n = 0;
+  _lofiTimers[ch] = setInterval(() => {
+    cur += d; n++;
+    ael.volume = Math.max(0, Math.min(1, cur));
+    if (n >= steps) { clearInterval(_lofiTimers[ch]); _lofiTimers[ch] = null; if (cb) cb(); }
+  }, iv);
+}
+
+function _overlayStart(ch, ael, src) {
+  if (_lofiTimers[ch]) { clearInterval(_lofiTimers[ch]); _lofiTimers[ch] = null; }
+  ael.src = src; ael.volume = 0;
+  ael.play().catch(() => {});
+  _fadeTo(ch, ael, _lofiVolumeTarget());
+}
+
+function _overlayStop(ch, ael, cb) {
+  if (_lofiTimers[ch]) { clearInterval(_lofiTimers[ch]); _lofiTimers[ch] = null; }
+  if (ael.paused) { ael.volume = 0; if (cb) cb(); return; }
+  _fadeTo(ch, ael, 0, () => { ael.pause(); if (cb) cb(); });
+}
+
+function _resetAllOverlays() {
+  // thunder resets with main (tied to rain)
+  _overlayStop('thunder', _lofiThunderAudio);
+  _lofiThunderOn = false; _lofiLightning = false;
+  document.getElementById('thunder-toggle-btn')?.classList.remove('active');
+  // piano is independent — NOT reset when main pauses
+}
+
+function lofiToggleThunder() {
+  _lofiThunderOn = !_lofiThunderOn;
+  document.getElementById('thunder-toggle-btn').classList.toggle('active', _lofiThunderOn);
+  if (_lofiThunderOn) {
+    _lofiLightning = true; _scheduleLightning();
+    _overlayStart('thunder', _lofiThunderAudio, '/more-focus/api/sounds/thunder');
+  } else {
+    _lofiLightning = false;
+    _overlayStop('thunder', _lofiThunderAudio);
+  }
+}
+
+// แสดง controls (▶ + volume) ครั้งแรกที่มีการเลือกเสียง
+function _lofiShowControls() {
+  document.getElementById('lofi-ctrl-reveal')?.classList.add('show');
+}
+
+// เลือกประเภทเปียโน → เป็น main sound + reveal controls ถ้ายังไม่แสดง
+function lofiPianoSelect(type) {
+  const wasRain = _lofiSound === 'rain';
+  _lofiPianoType = type;
+  document.getElementById('piano1-sel-btn')?.classList.toggle('active', type === 'piano1');
+  document.getElementById('piano2-sel-btn')?.classList.toggle('active', type === 'piano2');
+  if (wasRain && _lofiThunderOn) {
+    _overlayStop('thunder', _lofiThunderAudio); _lofiLightning = false;
+  }
+  _lofiApplySound(type);
+  _lofiStartBg(type);
+  document.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector('[data-sound="piano"]')?.classList.add('active');
+  _lofiShowControls();
+}
+
+// ล้าง active state ของ piano sub-buttons ตอน switch ออกจาก piano
+function _pianoClearCtrl() {
+  document.getElementById('piano1-sel-btn')?.classList.remove('active');
+  document.getElementById('piano2-sel-btn')?.classList.remove('active');
+}
+
+function lofiToggle() {
+  if (!_lofiSound) return;
+  const vol = _lofiVolumeTarget();
+  if (_lofiPlaying) {
+    _lofiPlaying = false;
+    document.getElementById('lofi-play-btn').textContent = '\u25b6';
+    setText('lofi-status', _LOFI_LABELS[_lofiSound]);
+    _fadeTo('main', _lofiAudio, 0, () => _lofiAudio.pause());
+    _resetAllOverlays();
+  } else {
+    _lofiAudio.src = '/more-focus/api/sounds/' + _lofiSound; _lofiAudio.volume = 0;
+    _lofiPlaying = true;
+    document.getElementById('lofi-play-btn').textContent = '\u23f8';
+    setText('lofi-status', '\u23f3 \u0e01\u0e33\u0e25\u0e31\u0e07\u0e42\u0e2b\u0e25\u0e14...');
+    _lofiAudio.play().then(() => {
+      _fadeTo('main', _lofiAudio, vol);
+      setText('lofi-status', _LOFI_LABELS[_lofiSound] + ' \u2014 \u0e01\u0e33\u0e25\u0e31\u0e07\u0e40\u0e25\u0e48\u0e19...');
+    }).catch(e => {
+      _lofiPlaying = false;
+      document.getElementById('lofi-play-btn').textContent = '\u25b6';
+      setText('lofi-status', '\u274c ' + e.message);
+    });
+  }
+}
+
+function lofiVol(v) {
+  const vol = parseFloat(v);
+  if (!_lofiTimers.main)    _lofiAudio.volume = vol;
+  if (!_lofiTimers.thunder && !_lofiThunderAudio.paused) _lofiThunderAudio.volume = vol;
+  const pct = document.getElementById('lofi-vol-pct');
+  if (pct) { pct.textContent = Math.round(vol*100)+'%'; pct.style.left = (vol*100)+'%'; }
+}
+
+function _lofiApplySound(type) {
+  _lofiSound = type;
+  if (!_lofiPlaying) { setText('lofi-status', _LOFI_LABELS[type]); return; }
+  const vol = _lofiVolumeTarget();
+  if (_lofiTimers.main) {
+    clearInterval(_lofiTimers.main); _lofiTimers.main = null;
+    _lofiAudio.pause();
+    _lofiAudio.src = '/more-focus/api/sounds/' + type; _lofiAudio.volume = 0;
+    _lofiAudio.play().catch(() => {});
+    _fadeTo('main', _lofiAudio, vol);
+  } else {
+    _fadeTo('main', _lofiAudio, 0, () => {
+      _lofiAudio.src = '/more-focus/api/sounds/' + type; _lofiAudio.volume = 0;
+      _lofiAudio.play().catch(() => {});
+      _fadeTo('main', _lofiAudio, vol);
+    });
+  }
+  setText('lofi-status', _LOFI_LABELS[type] + ' \u2014 \u0e01\u0e33\u0e25\u0e31\u0e07\u0e40\u0e25\u0e48\u0e19...');
+}
+
+function _lofiDeselect() {
+  if (_lofiPlaying) {
+    _lofiPlaying = false;
+    document.getElementById('lofi-play-btn').textContent = '▶';
+    setText('lofi-status', '');
+    _fadeTo('main', _lofiAudio, 0, () => { _lofiAudio.pause(); _lofiAudio.src = ''; });
+  }
+  if (_lofiThunderOn) { _overlayStop('thunder', _lofiThunderAudio); _lofiLightning = false; }
+  document.getElementById('rain-sub')?.classList.remove('open');
+  document.getElementById('piano-sub')?.classList.remove('open');
+  document.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+  _pianoClearCtrl();
+  document.getElementById('lofi-ctrl-reveal')?.classList.remove('show');
+  _lofiSound = '';
+}
+
+function lofiSelectMain(type) {
+  const rainSub = document.getElementById('rain-sub');
+  const pianSub = document.getElementById('piano-sub');
+  const isRain = type === 'rain', isPiano = type === 'piano';
+  const wasRain = _lofiSound === 'rain';
+  const isPianoActive = _lofiSound === 'piano1' || _lofiSound === 'piano2';
+
+  // กดอีโมจิที่เลือกอยู่แล้ว → deselect + หุบ controls
+  if ((isRain && wasRain) || (isPiano && isPianoActive) || (!isRain && !isPiano && _lofiSound === type)) {
+    _lofiDeselect();
+    return;
+  }
+
+  if (isRain) {
+    const open = rainSub.classList.contains('open');
+    if (!open || !wasRain) {
+      rainSub.classList.add('open');
+      if (!wasRain) {
+        _lofiApplySound('rain'); _lofiStartBg('rain');
+        if (_lofiThunderOn && _lofiPlaying) {
+          _overlayStart('thunder', _lofiThunderAudio, '/more-focus/api/sounds/thunder');
+          _lofiLightning = true; _scheduleLightning();
+        }
+      }
+      _lofiShowControls();
+    } else { rainSub.classList.remove('open'); }
+    pianSub.classList.remove('open');
+    document.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-sound="rain"]').classList.add('active');
+  } else if (isPiano) {
+    pianSub.classList.toggle('open');
+    rainSub.classList.remove('open');
+    if (!isPianoActive) _pianoClearCtrl();
+    document.querySelector('[data-sound="piano"]')
+      ?.classList.toggle('active', isPianoActive || pianSub.classList.contains('open'));
+  } else {
+    rainSub.classList.remove('open'); pianSub.classList.remove('open');
+    if (wasRain && _lofiThunderOn) { _overlayStop('thunder', _lofiThunderAudio); _lofiLightning = false; }
+    if (isPianoActive) _pianoClearCtrl();
+    _lofiApplySound(type); _lofiStartBg(type);
+    document.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-sound="' + type + '"]').classList.add('active');
+    _lofiShowControls();
+  }
+}
+
+
+// Lofi clock
+function tickLofi(){
+  const now=new Date();
+  document.getElementById('lofi-hm').textContent=pad(now.getHours())+':'+pad(now.getMinutes());
+  document.getElementById('lofi-ss').textContent=pad(now.getSeconds());
+  document.getElementById('lofi-date').textContent=now.toLocaleDateString('th-TH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+setInterval(tickLofi,500);tickLofi();
+// start animation if lofi page is default active
+if(document.getElementById('page-lofi').classList.contains('active'))_lofiStartBg(_lofiSound);
+
+// ===== KEYBOARD SHORTCUTS =====
+// Space: play/pause | ArrowUp/+: vol +5% | ArrowDown/-: vol -5%
+let _lofiVolTimer = null;
+function _lofiAdjVol(delta) {
+  const sl = document.getElementById('lofi-vol');
+  if (!sl) return;
+  const nv = Math.min(1, Math.max(0, parseFloat(sl.value) + delta));
+  sl.value = nv;
+  lofiVol(nv);
+  const pct = document.getElementById('lofi-vol-pct');
+  if (pct) {
+    pct.style.opacity = '1';
+    pct.style.transform = 'translateX(-50%) translateY(0)';
+    clearTimeout(_lofiVolTimer);
+    _lofiVolTimer = setTimeout(() => { pct.style.opacity = ''; pct.style.transform = ''; }, 1200);
+  }
+}
+document.addEventListener('keydown', function(e) {
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (e.code === 'Space') { e.preventDefault(); lofiToggle(); }
+  else if (e.code === 'ArrowUp' || e.key === '+' || e.key === '=') { e.preventDefault(); _lofiAdjVol(0.05); }
+  else if (e.code === 'ArrowDown' || e.key === '-') { e.preventDefault(); _lofiAdjVol(-0.05); }
+});
+
+// ===== INIT =====
+// init
+_lofiStartBg(_lofiSound);
+</script>
+</body>
+</html>
